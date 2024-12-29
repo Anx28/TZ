@@ -1,0 +1,84 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: web-app
+  labels:
+    app: web-app
+spec:
+  replicas: 4 #  количество реплик для обработки пиковой нагрузки
+  selector:
+    matchLabels:
+      app: web-app
+  template:
+    metadata:
+      labels:
+        app: web-app
+    spec:
+      containers:
+        - name: web-app
+          image: your-docker-image:latest # Образ приложения
+          resources:
+            requests:
+              cpu: "0.4" # Резервируем ресурсы для первой нагрузки (ускорение старта) (приложению требуется значительно больше ресурсов CPU)
+              memory: "128Mi"
+            limits:
+              cpu: "1" # Ограничиваем потребление CPU для высоких нагрузок
+              memory: "256Mi"
+          ports:
+            - containerPort: 80
+          readinessProbe: # Учитываем время инициализации приложения
+            httpGet:
+              path: /healthz
+              port: 80
+            initialDelaySeconds: 10 # Задержка, чтобы под успел инициализироваться (риложение требует около 5-10 секунд для инициализации)
+            periodSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 80
+            initialDelaySeconds: 30 # Проверка только после гарантированного запуска
+            periodSeconds: 15
+      affinity:
+        podAntiAffinity: # Размещаем поды на разных нодах для повышения отказоустойчивости
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                labelSelector:
+                  matchExpressions:
+                    - key: app
+                      operator: In
+                      values:
+                        - web-app
+                topologyKey: kubernetes.io/hostname
+  strategy:
+    type: RollingUpdate # Используем обновление без прерывания сервиса
+    rollingUpdate:
+      maxUnavailable: 1 # Минимум 3 реплики всегда будут доступны
+      maxSurge: 1 # Обеспечиваем плавное добавление новых подов
+---
+apiVersion: v1
+kind: HorizontalPodAutoscaler
+metadata:
+  name: web-app-hpa
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: web-app
+  minReplicas: 1 # Минимальное количество реплик для ночного времени
+  maxReplicas: 4 # Максимальное количество реплик для дневного пика
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        targetAverageUtilization: 50 # Автошкейлинг на основе использования CPU
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: web-app-pdb
+spec:
+  minAvailable: 3 # Обеспечиваем минимум 3 пода в рабочем состоянии
+  selector:
+    matchLabels:
+      app: web-app
