@@ -1,0 +1,105 @@
+---
+- name: Deploy Django Application Stack
+  hosts: app_servers
+  become: yes
+  vars:
+    app_name: django_app
+    app_user: django
+    app_group: django
+    django_port: 8000
+    db_name: django_db
+    db_user: django_user
+    db_password: "{{ vault_db_password }}"
+    python_version: python3.10
+    venv_path: "/opt/{{ app_name }}/venv"
+    app_path: "/opt/{{ app_name }}"
+    nginx_config_path: "/etc/nginx/sites-available"
+
+  tasks:
+    - name: Install system dependencies
+      apt:
+        name:
+          - "{{ python_version }}"
+          - "{{ python_version }}-venv"
+          - postgresql
+          - postgresql-contrib
+          - nginx
+          - git
+        state: present
+        update_cache: yes
+
+    - name: Create application user
+      user:
+        name: "{{ app_user }}"
+        group: "{{ app_group }}"
+        system: yes
+        createhome: yes
+        home: "{{ app_path }}"
+        shell: /bin/bash
+
+    - name: Create virtual environment
+      command:
+        cmd: "{{ python_version }} -m venv {{ venv_path }}"
+        creates: "{{ venv_path }}"
+
+    - name: Install Python dependencies
+      pip:
+        name:
+          - django
+          - djangorestframework
+          - psycopg2-binary
+          - gunicorn
+        virtualenv: "{{ venv_path }}"
+        state: present
+
+    - name: Create Django project
+      django_project:
+        name: "{{ app_name }}"
+        path: "{{ app_path }}"
+        virtualenv: "{{ venv_path }}"
+        settings: "{{ app_name }}.settings"
+      when: not ansible_check_mode
+
+    - name: Configure PostgreSQL
+      postgresql_db:
+        name: "{{ db_name }}"
+        state: present
+
+    - name: Create database user
+      postgresql_user:
+        db: "{{ db_name }}"
+        name: "{{ db_user }}"
+        password: "{{ db_password }}"
+        priv: ALL
+        state: present
+
+    - name: Configure nginx
+      template:
+        src: templates/nginx.conf.j2
+        dest: "{{ nginx_config_path }}/{{ app_name }}"
+      notify: restart nginx
+
+    - name: Enable nginx site
+      file:
+        src: "{{ nginx_config_path }}/{{ app_name }}"
+        dest: "/etc/nginx/sites-enabled/{{ app_name }}"
+        state: link
+      notify: restart nginx
+
+    - name: Create systemd service
+      template:
+        src: templates/gunicorn.service.j2
+        dest: "/etc/systemd/system/{{ app_name }}.service"
+      notify: restart gunicorn
+
+  handlers:
+    - name: restart nginx
+      service:
+        name: nginx
+        state: restarted
+
+    - name: restart gunicorn
+      systemd:
+        name: "{{ app_name }}"
+        state: restarted
+        daemon_reload: yes
