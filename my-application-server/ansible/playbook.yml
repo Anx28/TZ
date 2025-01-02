@@ -1,0 +1,9 @@
+---
+- name: Deploy application server stack
+  hosts: all
+  become: true
+
+  roles:
+    - role: postgresql
+    - role: django
+    - role: nginx
