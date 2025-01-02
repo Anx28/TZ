@@ -1,0 +1,20 @@
+---
+- name: Install PostgreSQL
+  apt:
+    name: postgresql
+    state: present
+
+- name: Ensure PostgreSQL is running
+  service:
+    name: postgresql
+    state: started
+    enabled: true
+
+- name: Create database and user
+  become_user: postgres
+  postgres_db:
+    name: myapp_db
+  postgres_user:
+    name: myapp_user
+    password: myapp_password
+    priv: "ALL"
