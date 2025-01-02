@@ -52,13 +52,75 @@
         virtualenv: "{{ venv_path }}"
         state: present
 
-    - name: Create Django project
+        - name: Create Django project
       django_project:
         name: "{{ app_name }}"
         path: "{{ app_path }}"
         virtualenv: "{{ venv_path }}"
         settings: "{{ app_name }}.settings"
       when: not ansible_check_mode
+
+    # Новые tasks для настройки healthcheck
+    - name: Create healthcheck app
+      django_app:
+        name: healthcheck
+        project_path: "{{ app_path }}"
+        virtualenv: "{{ venv_path }}"
+      when: not ansible_check_mode
+
+    - name: Create healthcheck directory structure
+      file:
+        path: "{{ app_path }}/healthcheck"
+        state: directory
+        owner: "{{ app_user }}"
+        group: "{{ app_group }}"
+        mode: '0755'
+
+    - name: Copy healthcheck views.py
+      copy:
+        src: files/healthcheck/views.py
+        dest: "{{ app_path }}/healthcheck/views.py"
+        owner: "{{ app_user }}"
+        group: "{{ app_group }}"
+        mode: '0644'
+      notify: restart gunicorn
+
+    - name: Copy healthcheck urls.py
+      copy:
+        src: files/healthcheck/urls.py
+        dest: "{{ app_path }}/healthcheck/urls.py"
+        owner: "{{ app_user }}"
+        group: "{{ app_group }}"
+        mode: '0644'
+      notify: restart gunicorn
+
+    - name: Create healthcheck __init__.py
+      copy:
+        content: ""
+        dest: "{{ app_path }}/healthcheck/__init__.py"
+        owner: "{{ app_user }}"
+        group: "{{ app_group }}"
+        mode: '0644'
+
+    - name: Update project URLs
+      blockinfile:
+        path: "{{ app_path }}/{{ app_name }}/urls.py"
+        block: |
+          from django.urls import path, include
+
+          urlpatterns = [
+              path('', include('healthcheck.urls')),
+          ]
+        marker: "# {mark} ANSIBLE MANAGED BLOCK"
+        insertafter: "urlpatterns = ["
+        create: yes
+
+    - name: Update INSTALLED_APPS in settings.py
+      lineinfile:
+        path: "{{ app_path }}/{{ app_name }}/settings.py"
+        line: "    'healthcheck',"
+        insertafter: "INSTALLED_APPS = ["
+        state: present
 
     - name: Configure PostgreSQL
       postgresql_db:
