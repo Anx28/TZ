@@ -1,0 +1,15 @@
+[Unit]
+Description=gunicorn daemon for {{ app_name }}
+After=network.target
+
+[Service]
+User={{ app_user }}
+Group={{ app_group }}
+WorkingDirectory={{ app_path }}
+ExecStart={{ venv_path }}/bin/gunicorn \
+    --workers 3 \
+    --bind 127.0.0.1:{{ django_port }} \
+    {{ app_name }}.wsgi:application
+
+[Install]
+WantedBy=multi-user.target
