@@ -1,0 +1,5 @@
+all:
+  hosts:
+    myserver:
+      ansible_host: <your-server-ip>
+      ansible_user: <your-server-user>
