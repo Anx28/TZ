@@ -1,0 +1,33 @@
+---
+- name: Install Django and dependencies
+  pip:
+    name:
+      - django
+      - djangorestframework
+      - psycopg2
+    state: present
+
+- name: Configure settings.py
+  template:
+    src: settings.py.j2
+    dest: /path/to/django_project/settings.py
+
+- name: Apply migrations
+  command: python3 manage.py migrate
+  args:
+    chdir: /path/to/django_project
+
+- name: Collect static files
+  command: python3 manage.py collectstatic --noinput
+  args:
+    chdir: /path/to/django_project
+
+- name: Configure Gunicorn
+  template:
+    src: gunicorn.service.j2
+    dest: /etc/systemd/system/gunicorn.service
+
+- name: Restart Gunicorn
+  systemd:
+    name: gunicorn
+    state: restarted
