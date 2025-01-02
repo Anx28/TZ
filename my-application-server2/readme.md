@@ -12,6 +12,14 @@ Structure:
     ├── nginx.conf.j2
     └── gunicorn.service.j2
 
+Create a vault file for secrets:
+```bash
+ansible-vault create group_vars/all/vault.yml
+# Add the following:
+vault_db_password: your_secure_password
+```
+
+
 ```
 Running the playbook:
 ```
