@@ -1,0 +1,23 @@
+# /etc/systemd/system/monitor_test.service
+[Unit]
+Description=Monitor Test Process
+After=network.target
+Wants=network-online.target
+
+[Service]
+ExecStart=/usr/local/bin/monitor_test.sh
+Restart=on-failure
+RestartSec=10
+
+# Таймер /etc/systemd/system/monitor_test.timer  Второй юнит (или использовать крон)
+
+[Unit]
+Description=Run monitor_test.sh every minute
+
+[Timer]
+OnBootSec=30s
+OnUnitActiveSec=60s
+Unit=monitor_test.service
+
+[Install]
+WantedBy=timers.target
