@@ -3,7 +3,7 @@
 # Делаем скрипт исполняемым
 sudo chmod +x /usr/local/bin/monitor_test.sh
 
-# Обновляем Systemd
+# Добавляем юниты и обновляем Systemd
 sudo systemctl daemon-reload
 
 # Включаем и запускаем таймер
